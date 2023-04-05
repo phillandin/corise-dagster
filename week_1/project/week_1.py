@@ -61,11 +61,11 @@ def get_s3_data_op(context):
 
 
 @op(ins={'stock_data': In(dagster_type=List, description='list of Stock objects')},
-    out={'high_date': Out(dagster_type=Aggregation, description='date greatest high value')})
+    out={'high_date': Out(dagster_type=Aggregation, description='date with greatest high value')})
 def process_data_op(stock_data):
-    highs = list(map(lambda x: Aggregation(date=x.date, high=x.high), stock_data))
-    highest_high_date = max(highs, key=attrgetter('high'))
-    return highest_high_date
+    highs = map(lambda x: Aggregation(date=x.date, high=x.high), stock_data)
+    high_date = max(highs, key=attrgetter('high'))
+    return high_date
 
 
 @op(ins={'high_date': In(dagster_type=Aggregation)})
