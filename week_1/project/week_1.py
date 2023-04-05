@@ -11,6 +11,8 @@ from dagster import (
     job,
     op,
     usable_as_dagster_type,
+    DynamicOut,
+    DynamicOutput
 )
 from pydantic import BaseModel
 
@@ -50,9 +52,11 @@ def csv_helper(file_name: str) -> Iterator[Stock]:
             yield Stock.from_list(row)
 
 
-@op
-def get_s3_data_op():
-    pass
+@op(config_schema={'s3_key': str})
+def get_s3_data_op(context):
+    s3_key = context.op_config['s3_key']
+    stocks = [i for i in csv_helper(s3_key)]
+    return stocks
 
 
 @op
