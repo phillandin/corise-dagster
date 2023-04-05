@@ -1,6 +1,7 @@
 import csv
 from datetime import datetime
 from typing import Iterator, List
+from operator import attrgetter
 
 from dagster import (
     In,
@@ -59,21 +60,27 @@ def get_s3_data_op(context):
     return stocks
 
 
-@op
-def process_data_op():
+@op(ins={'stock_data': In(dagster_type=List, description='list of Stock objects')},
+    out={'high_date': Out(dagster_type=Aggregation, description='date greatest high value')})
+def process_data_op(stock_data):
+    highs = list(map(lambda x: Aggregation(date=x.date, high=x.high), stock_data))
+    highest_high_date = max(highs, key=attrgetter('high'))
+    return highest_high_date
+
+
+@op(ins={'high_date': In(dagster_type=Aggregation)})
+def put_redis_data_op(high_date):
     pass
 
 
-@op
-def put_redis_data_op():
-    pass
-
-
-@op
-def put_s3_data_op():
+@op(ins={'high_date': In(dagster_type=Aggregation)})
+def put_s3_data_op(high_date):
     pass
 
 
 @job
 def machine_learning_job():
-    pass
+    stock_data_list = get_s3_data_op()
+    high = process_data_op(stock_data_list)
+    put_redis_data_op(high)
+    put_s3_data_op(high)
