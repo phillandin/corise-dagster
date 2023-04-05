@@ -1,7 +1,6 @@
 import csv
 from datetime import datetime
 from typing import Iterator, List
-from operator import attrgetter
 
 from dagster import (
     In,
@@ -64,7 +63,7 @@ def get_s3_data_op(context):
     out={'high_date': Out(dagster_type=Aggregation, description='date with greatest high value')})
 def process_data_op(stock_data):
     highs = map(lambda x: Aggregation(date=x.date, high=x.high), stock_data)
-    high_date = max(highs, key=attrgetter('high'))
+    high_date = max(highs, key=lambda x: x.high)
     return high_date
 
 
