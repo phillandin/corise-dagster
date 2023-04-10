@@ -55,35 +55,63 @@ def csv_helper(file_name: str) -> Iterator[Stock]:
             yield Stock.from_list(row)
 
 
-@op
-def get_s3_data_op():
+@op(
+    config_schema={'s3_key': str},
+    out={
+            'empty_stocks': Out(is_required=False),
+            'stock_data': Out(dagster_type=List[Stock], is_required=False),
+    }
+)
+def get_s3_data_op(context):
+    s3_key = context.op_config['s3_key']
+    stock_data = [*csv_helper(s3_key)]
+    if len(stock_data) == 0:
+        yield Output(None, 'empty_stocks')
+    else:
+        yield Output(stock_data, 'stock_data')
+
+
+@op(
+    config_schema={
+        'nlargest': int
+    },
+    ins={
+        'stock_data': In(dagster_type=List, description='list of Stock objects')
+    },
+    out=DynamicOut()
+)
+def process_data_op(context, stock_data):
+    nlargest = context.op_config['nlargest']
+    stock_data.sort(key=lambda x: x.high)
+    highest_highs = stock_data[:nlargest]
+    for date in highest_highs:
+        yield DynamicOutput(Aggregation(date=date.date, high=date.high), mapping_key=date.date.strftime('%Y_%m_%d'))
+
+
+@op(ins={'highs_list': In(dagster_type=List[Aggregation])})
+def put_redis_data_op(highs_list):
     pass
 
 
-@op
-def process_data_op():
-    pass
-
-
-@op
-def put_redis_data_op():
-    pass
-
-
-@op
-def put_s3_data_op():
+@op(ins={'highs_list': In(dagster_type=List[Aggregation])})
+def put_s3_data_op(highs_list):
     pass
 
 
 @op(
     ins={"empty_stocks": In(dagster_type=Any)},
     out=Out(Nothing),
-    description="Notifiy if stock list is empty",
+    description="Notify if stock list is empty",
 )
 def empty_stock_notify_op(context: OpExecutionContext, empty_stocks: Any):
     context.log.info("No stocks returned")
+    context.log.info(f'Received input of type {type(empty_stocks)}')
 
 
 @job
 def machine_learning_dynamic_job():
-    pass
+    empty_stocks, stock_data = get_s3_data_op()
+    empty_stock_notify_op(empty_stocks)
+    highs = process_data_op(stock_data).collect()
+    put_redis_data_op(highs)
+    put_s3_data_op(highs)
