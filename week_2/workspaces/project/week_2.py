@@ -34,16 +34,16 @@ def process_data(stock_data):
 
 
 @op(required_resource_keys={'redis'},
-    ins={'high_date': In(dagster_type=Aggregation, description='date with greatest high value')})
+    ins={'high_date': In(dagster_type=Aggregation, description='aggregation written to redis')})
 def put_redis_data(context, high_date):
     context.resources.redis.put_data(str(high_date.date), str(high_date.high))
 
 
 @op(required_resource_keys={'s3'},
-    ins={'high_date': In(dagster_type=Aggregation, description='date with greatest high value')})
+    ins={'high_date': In(dagster_type=Aggregation, description='aggregation uploaded to S3')})
 def put_s3_data(context, high_date):
-    s3_key = S3_FILE
-    context.resources.s3.put_data(s3_key, high_date)
+    key = f'aggr_{high_date.date.strftime("%Y%m%d")}'
+    context.resources.s3.put_data(key, high_date)
 
 
 @graph
