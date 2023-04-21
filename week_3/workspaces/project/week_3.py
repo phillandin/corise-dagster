@@ -27,7 +27,8 @@ from workspaces.types import Aggregation, Stock
 @op(required_resource_keys={'s3'},
     config_schema={'s3_key': str},
     out={'stock_data': Out(dagster_type=List[Stock], description='list of Stock objects')},
-    tags={'kind': 's3'})
+    tags={'kind': 's3'},
+    description='Reads stock data from an S3 bucket and returns of list of Stock objects.')
 def get_s3_data(context):
     s3_key = context.op_config['s3_key']
     data = [*context.resources.s3.get_data(s3_key)]
@@ -36,7 +37,8 @@ def get_s3_data(context):
 
 
 @op(ins={'stock_data': In(dagster_type=List, description='list of Stock objects')},
-    out={'high_date': Out(dagster_type=Aggregation, description='date with greatest high value')})
+    out={'high_date': Out(dagster_type=Aggregation, description='date with greatest high value')},
+    description='Receives list of Stock objects, selects date with the highest daily high value, returns an Aggregation object using the date and high value.')
 def process_data(stock_data):
     high_date = max(stock_data, key=lambda x: x.high)
     return Aggregation(date=high_date.date, high=high_date.high)
@@ -44,14 +46,16 @@ def process_data(stock_data):
 
 @op(required_resource_keys={'redis'},
     ins={'high_date': In(dagster_type=Aggregation, description='aggregation written to redis')},
-    tags={'kind': 'redis'})
+    tags={'kind': 'redis'},
+    description='Writes Aggregation date and high values to Redis.')
 def put_redis_data(context, high_date):
     context.resources.redis.put_data(str(high_date.date), str(high_date.high))
 
 
 @op(required_resource_keys={'s3'},
     ins={'high_date': In(dagster_type=Aggregation, description='aggregation uploaded to S3')},
-    tags={'kind': 's3'})
+    tags={'kind': 's3'},
+    description='Writes Aggregation to S3.')
 def put_s3_data(context, high_date):
     key = f'aggr_{high_date.date.strftime("%Y%m%d")}'
     context.resources.s3.put_data(key, high_date)
