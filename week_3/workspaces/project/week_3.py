@@ -110,17 +110,21 @@ machine_learning_job_docker = machine_learning_graph.to_job(
 )
 
 
-machine_learning_schedule_local = ScheduleDefinition(job=machine_learning_job_local, cron_schedule='*/15 * * * *')
+machine_learning_schedule_local = ScheduleDefinition(job=machine_learning_job_local, cron_schedule='*/2 * * * *')
 
 
-@schedule(job=machine_learning_job_docker, cron_schedule='0 * * * *')
-def machine_learning_schedule_docker():
-    scheduled_date = context.scheduled_execution_time.strftime("%Y-%m-%d")
-    return RunRequest(
-        run_key=None,
-        run_config=docker_config,
-        tags={"date": scheduled_date},
-    )
+@schedule(job=machine_learning_job_docker, cron_schedule='0/1 * * * *')
+def machine_learning_schedule_docker(context):
+    # scheduled_date = context.scheduled_execution_time.strftime("%Y-%m-%d")
+    # return RunRequest(
+    #     run_key=None,
+    #     run_config=docker_config,
+    #     tags={"date": scheduled_date},
+    # )
+    for partition_key in docker_config.get_partition_keys():
+        yield RunRequest(
+            run_key=partition_key, run_config=docker_config.get_run_config_for_partition_key(partition_key)
+        )
 
 
 @sensor(job=machine_learning_job_docker, minimum_interval_seconds=30)
